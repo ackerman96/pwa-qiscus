@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+     <!-- <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">  -->
+    <title>Document</title>
+    <link rel="stylesheet" type="text/css" href="https://latest-multichannel.qiscus.com/css/qiscus-sdk.2.10.0.css">
+    <link rel="manifest" href="/manifest.json"/>
+    <!-- ios support -->
+    <!-- <link rel="apple-touch-icon" href="images/icons/icon-72x72.png" />
+    <link rel="apple-touch-icon" href="images/icons/icon-96x96.png" />
+    <link rel="apple-touch-icon" href="images/icons/icon-128x128.png" />
+    <link rel="apple-touch-icon" href="images/icons/icon-144x144.png" />
+    <link rel="apple-touch-icon" href="images/icons/icon-152x152.png" />
+    <link rel="apple-touch-icon" href="images/icons/icon-192x192.png" />
+    <link rel="apple-touch-icon" href="images/icons/icon-384x384.png" />
+    <link rel="apple-touch-icon" href="images/icons/icon-512x512.png" />
+    <meta name="apple-mobile-web-app-status-bar" content="#db4938" />
+    <meta name="theme-color" content="#db4938" /> -->
+
+    <style>
+        *, *:before, *:after { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+        .list-meta small {
+            word-break: break-all;
+        }
+        .container {
+            width: 100%; height: 100%;
+            display: flex;
+            color: #444;
+            font-family: sans-serif;
+            overflow-y: auto;
+        }
+        .main-page {
+            flex: 1;
+        }
+        .widget-area {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+        .widget-footer {
+            display: flex;
+            height: 70px; width: 100%;
+            background: #ddd;
+            align-items: center;
+            justify-content: space-around;
+        }
+        .widget-footer img { width: 32px; cursor: pointer; }
+        .section {
+            margin: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(0,0,0,.15);
+            padding: 15px;
+        }
+        .section h2 {margin-bottom: 1.3rem; border-bottom: 1px dotted #ddd;}
+        .section li { display: flex; justify-content: space-between; margin-bottom: 1.5rem; }
+        .list-meta { display: flex; flex-direction: column;}
+        .list-action img { width: 24px; cursor: pointer;}
+
+        .camera-area { position: fixed; width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center;
+            background: rgba(0,0,0,.75); border-radius: 5px; padding: 30px; }
+        .camera-area video { margin-bottom: 1.5rem;}
+        .camera-buttons { display: flex; }
+        .microphone-area { position: fixed; width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center;
+            background: rgba(0,0,0,.75); border-radius: 5px; padding: 30px; }
+        .microphone-area audio { margin-bottom: 1.5rem;}
+        .microphone-buttons { display: flex; }
+        .deletedUI {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        #screen-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            background: rgba(0,0,0,.35);
+        }
+        #deletedUI__content{
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60%;
+            height: 60%;
+            z-index: 3;
+            background: rgba(255,255,255,.80);
+            box-shadow: 0 15px 15px rgba(0,0,0,.15);
+            border-radius: 5px;
+            padding: 20px;
+            overflow: auto;
+        }
+        .deletedUI__row img {
+            width: 16px;
+            cursor: pointer;
+        }
+        .deletedUI__row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+        .qcw-header .qc-icon {
+            display: none;
+        }
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14"></script>
+    <script src="lodash.js"></script>
+    <!-- <script src="https://unpkg.com/axios/dist/axios.min.js"></script> -->
+    <!-- <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script> -->
+    <script>
+        // import {reactive} from 'vue'
+        document.addEventListener('backButton', ()=>{
+            window.history.back();
+            const page = this.switchPage;
+            if(page !== 'main') QiscusSDK.render();
+
+        });
+
+    </script>
+</head>
+<body>
+
+    <div class="container">
+        <div class="deletedUI" v-if="isDeleteUI">
+            <div id="screen-overlay"></div>
+            <div id="deletedUI__content">
+                <div v-for="message in messages" :key = "message.id" class="deletedUI__row">
+                    <div>
+                        {{message.message}}
+                    </div>
+                    <div @click="deleteComment(message.unique_id, message.id)">
+                        <img src="https://img.icons8.com/pastel-glyph/64/000000/trash.png" alt="delete comment">
+                    </div>
+                </div>
+                <button @click="isDeleteUI = false">close</button>
+            </div>
+        </div>
+        <div class="main-page" v-show="activePage == 'main'">
+            <div class="section">
+                <h2>Contacts</h2>
+                <ul>
+                    <li v-for="contact in contacts" :key="contact.id">
+                        <div class="list-meta">
+                            <strong v-html="contact.name"></strong>
+                            <small>{{ contact.id }}</small>
+                        </div>
+                        <div class="list-action">
+                            <img @click="gotoTarget(contact.id)" src="https://img.icons8.com/material-outlined/24/000000/chat--v1.png"/>
+                            <img src="https://img.icons8.com/fluency-systems-regular/48/000000/phone-disconnected.png"/>
+                        </div>
+                    </li>
+                </ul>
+                <h2>Rooms List</h2>
+                <ul>
+                    <li v-for="room in rooms" :key="room.id">
+                        <div class="list-meta">
+                            <strong>{{ room.name }} {{ (room.count_notif>0) ? `(${room.count_notif})` : ''}}</strong>
+                            <small>{{ room.last_comment.message }}</small>
+                        </div>
+                        <div class="list-action">
+                            <img @click="gotoRoom(room.id)" src="https://img.icons8.com/material-outlined/24/000000/chat--v1.png"/>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="widget-area" v-show="activePage == 'chat'">
+            <div style="flex: 1;">
+                <div id="qiscus-widget"></div>
+            </div>
+            <div class="widget-footer">
+                <img @click="openMic" src="https://img.icons8.com/wired/64/000000/record.png"/>
+                <img @click="openCamera" src="https://img.icons8.com/ios/64/000000/camera--v3.png"/>
+                <a @click="sendLocation">
+                        <img src="https://img.icons8.com/external-justicon-lineal-justicon/64/000000/external-share-location-map-and-location-justicon-lineal-justicon.png"/>
+                </a>
+                <a @click="showDeleteUI">
+                    <img src="https://img.icons8.com/pastel-glyph/64/000000/trash.png"/>
+                </a>
+                <!-- bisa di tambahin delete / forward -->
+            </div>
+
+        </div>
+        <div class="microphone-area" v-show="isMicAreaVisible">
+            <!-- <video id="audio" width="320" height="240" autoplay srcObject=""></video> -->
+            <audio controls>
+                Your browser does not support the audio tag.
+              </audio>
+            <input type="file" accept="file/*" capture="microphone" />
+            <div class="display">
+                <!-- Add Messages and audio tag here -->
+            </div>
+
+            <div class="controllers">
+                <!-- Start, stop, download -->
+            </div>
+            <!-- <div class="camera-buttons">
+                <button id="take-photo" @click.prevent="renderImage">Take Photo</button>
+                <button id="upload-photo" @click.prevent="uploadFile" v-if="image_data_url">Upload Photo</button>
+                <button id="cancel-photo" @click.prevent="closeCamera">Cancel</button>
+            </div> -->
+            <!-- <canvas id="canvas" width="320" height="240"></canvas> -->
+        </div>
+        <div class="camera-area" v-show="isCameraAreaVisible">
+            <video id="video" width="320" height="240" autoplay srcObject=""></video>
+            <input type="file" accept="image/*" capture="camera" />
+            <div class="camera-buttons">
+                <button id="take-photo" @click.prevent="renderImage">Take Photo</button>
+                <button id="upload-photo" @click.prevent="uploadFile" v-if="image_data_url">Upload Photo</button>
+                <button id="cancel-photo" @click.prevent="closeCamera">Cancel</button>
+            </div>
+            <canvas id="canvas" width="320" height="240"></canvas>
+        </div>
+    </div>
+    <script src="https://latest-multichannel.qiscus.com/js/qiscus-sdk.2.10.0.js"></script>
+    <script>
+        const urlSearchParams = new URLSearchParams(window.location.search);
+        const params = Object.fromEntries(urlSearchParams.entries());
+        console.log('params', params);
+        // const jwt = result(params, 'token','');
+        // const jwt = params.token;
+        // const userDataString = params.userdata;
+        const tokenClient = params.tokenClient;
+        const tokenServer = params.tokenServer;
+        // const isLockedDevice = params.isLockedDevice;
+        // const userData = JSON.parse(userDataString);
+        // console.log('userData', userData);
+    </script>
+    <script>
+        // const axios = require('axios').default;
+
+        let App = new Vue({
+            el: '.container',
+            data: {
+                activePage: 'main',
+                contacts: [],
+                rooms: [],
+                stream: null,
+                srcObject: null,
+                canvas: document.querySelector("#canvas"),
+                video: document.querySelector("#video"),
+                image_data_url: null,
+                isCameraAreaVisible: false,
+                jwt:'',
+                srcMicrophone: null,
+                chats: [],
+                currentRoom : {},
+                isMicAreaVisible: false,
+                deletedRoomId: null,
+                unique_id: null,
+                isDeleteUI: false,
+                messages:[]
+            },
+            mounted() {
+                const self = this;
+                QiscusSDK.core.init({
+                    AppId: 'qchatsdk--ft8qw9jqrlb',
+                    // AppId: 'sdksample',
+                    mode:'wide',
+                    options: {
+                        // new messsages call back
+                        // kalau ada message baru  kasih event
+                        // message yang baru / unread
+                        // location bisa tapi harus ada key yang di regis di init
+                        loginSuccessCallback() {
+                            self.initiateData();
+                        },
+                        fileUploadedCallback() {
+                            self.closeCamera();
+                        },
+                        newMessagesCallback(){
+
+                        },
+                        typingCallback(){
+                            // ypingCallback: function(data) {
+                            var duplicateElement = $('.qismo-user-status--override');
+                            if(data.message && data.room_id == qiscus.selected.id) {
+                                duplicateElement.show();
+                                duplicateElement.siblings('div.qcw-user-status').hide();
+                                duplicateElement.html('typing...');
+                                // setTimeout(function () {
+                        }
+                    },
+                    showDesktopNotification(){
+
+                        if (Notification.permission === "granted") {
+                        // self.notifAudio.play();
+                        document.getElementById("qismo-notif-audio").play();
+                        const notification = new Notification(`you get a chat from ${data[0].username}`, {
+                            icon: data[0].user_avatar,
+                            body: (data[0].message.startsWith('[file]'))
+                                ? 'File attached.'
+                                : `${data[0].message.substring(0,50)}...`,
+                        });
+
+                        notification.onclick = function (e) {
+                            notification.close();
+                            parent.focus();
+                            window.focus();
+                            e.target.close();
+                        }
+                    }
+
+                    },
+                    
+                    }
+                    
+                });
+                // QiscusSDK.core.setUserWithIdentityToken(userData.results.user);
+
+                // QiscusSDK.render();
+
+                // QiscusSDK.core.setUser('guest@qiscus.com', 'password', 'Guest');
+                
+
+                // QiscusSDK.core.verifyIdentityToken(jwt)
+                // .then(function (userData) {
+                // })
+                QiscusSDK.core.getNonce()
+                .then(function (nonce) {
+                    const noncePlain = nonce.nonce;
+                    // Here you get identityToken from your own server
+                    // return getIdentityTokenFromServer(resp.nonce)
+                    // self.getJwt(nonce);
+                    // console.log('jwt di luar', data);
+                    // console.log('dump di dump',dump);
+                    // return jwt
+                    return fetch('http://10.32.1.83/PersonalBanking/rest/v3/action/get-qiscuss-jwt', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            nonce: noncePlain,
+                            tokenClient: tokenClient,
+                            tokenServer: tokenServer,
+                            isLockedDevice: true
+                        })
+                    }).then((res)=> {
+                        // console.log("res", res.json())
+                        return res.json()})
+                    .then((data) => {
+                        // .then(function (jwt) {
+                    // Pass jwt here
+                    const jwt = data.jwtQiscuss;
+                    console.log('jwt', jwt);
+                    return QiscusSDK.core.verifyIdentityToken(jwt)
+                })
+                .then(function (userData) {
+                    // Set user with user data from identity token
+                    return QiscusSDK.core.setUserWithIdentityToken(userData);
+                    QiscusSDK.render();
+                });
+                    //     jwt = data;
+                    //     console.log('jwt di dalam',jwt);
+                    //     console.log('data didalam', data);
+
+                    //     resolve(data);
+                    //     this.jwt = data;
+                    //     return data;
+                    // });
+                    // console.log(self.getJwt(noncePlain));
+                    // console.log('this', this.jwt, jwt, data)
+                    // return
+                });
+            },
+            methods: {
+
+                initiateData() {
+                    // populate contacts
+                    this.contacts = [
+                        // {id: 'fikri@qiscus.com', name: 'Rijalul Fikri'},
+                        // {id: 'e@qiscus.com', name: 'Evan'},
+                        {id: '109015', name: 'Ayu Anjarwati'},
+                        {id: 'dwi.f.riskayanti@banksinarmas.com', name: 'Dwi F Riskayanti'},
+                        {id: '77816', name: 'Reinaldo Riyandi'},
+                        {id: '95472', name: 'Alpin Hizkia'},
+                        {id: '77793', name:' Dewa Ayu'}
+                    ];
+                    console.log(' qiscus', QiscusSDK, 'Qiscus Core', QiscusSDK.core)
+                    // populate roomlist
+                    QiscusSDK.core.loadRoomList()
+                        .then((data) => {
+                            this.rooms = data;
+                            console.log(data);
+                        });
+                console.log('contacts',this.contacts);
+                },
+                switchPage(page) {
+                    this.activePage = page;
+                    if(page !== 'main') QiscusSDK.render();
+                },
+                gotoRoom(id) {
+                    // ada 2 jenis: one by one, chat target
+                    QiscusSDK.core.chatGroup(id);
+                    // this.getRoomId();
+                    this.switchPage('chat');
+                    console.log('goto room', id);
+                },
+                gotoTarget(id) {
+                    console.log('id', id)
+                    QiscusSDK.core.chatTarget(id).then((res)=>{
+                        this.currentRoom = res.room;
+                        console.log('res', res);
+                    });
+                    this.switchPage('chat');
+                    console.log('goto target', id);
+                    // this.getRoomId();
+
+                },
+                createRoomChat(roomName, userIds, options){
+                    QiscusSDK.core.createGroupRoom(roomName, userIds, options)
+                    .then((room)=>{
+                        this.currentRoom = room;
+                        this.switchPage('chat');
+                    }).catch((err)=>{
+                        console.log(err);
+                    });
+                },
+                async openCamera() {
+                    this.stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                    document.querySelector("#video").srcObject = this.stream;
+                    this.isCameraAreaVisible = true;
+                    document.getElementById('canvas').getContext('2d').clearRect(0,0,320,240);
+                },
+                blobToBase64(blob) {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(blob);
+                    return new Promise(resolve => {
+                        reader.onloadend = () => {
+                            resolve(reader.result);
+                        };
+                    });
+                },
+                recordAudio () {
+                    return new Promise(async resolve => {
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        const mediaRecorder = new MediaRecorder(stream);
+                        const audioChunks = [];
+
+                        mediaRecorder.addEventListener("dataavailable", event => {
+                            audioChunks.push(event.data);
+                        });
+
+                        const start = () => mediaRecorder.start();
+
+                        const stop = () =>
+                            new Promise(resolve => {
+                                    mediaRecorder.addEventListener("stop", () => {
+                                    const audioBlob = new Blob(audioChunks, {
+                                        'type': 'audio/mpeg-3'
+                                    });
+                                    const audioUrl = URL.createObjectURL(audioBlob);
+                                    const audio = new Audio(audioUrl);
+                                    const play = () => audio.play();
+                                    resolve({ audioBlob, audioUrl, play, audioBlob });
+                                });
+
+                                mediaRecorder.stop();
+                            });
+
+                        resolve({ start, stop });
+                    });
+                },
+                async openMic () {
+                    // record audio for 3 second then send it as comment
+                    const sleep = time => new Promise(resolve => setTimeout(resolve, time));
+
+                    (async () => {
+                        const recorder = await this.recordAudio();
+                        const roomId = qiscus.selected.id;
+                        recorder.start();
+                        await sleep(3000);
+                        const audio = await recorder.stop();
+                        const file = new File([audio.audioBlob], `${Date.now()}.mp3`, {'type': 'audio/mpeg-3'});
+                        QiscusSDK.core
+                            .uploadFile(roomId, file)
+                        audio.play();
+                    })();
+            },
+            async sendLocation() {
+
+                    var options = {
+                        enableHighAccuracy: true,
+                        timeout: 5000,
+                        maximumAge: 0
+                    };
+                    function success(pos) {
+                    var crd = pos.coords;
+
+                    console.log('Your current position is:');
+                    console.log(`Latitude : ${crd.latitude}`);
+                    console.log(`Longitude: ${crd.longitude}`);
+                    console.log(`More or less ${crd.accuracy} meters.`);
+
+                    qiscus.sendComment(qiscus.selected.id, '', 'null', 'location', {latitude: crd.latitude, longitude: crd.longitude, name: '', map_url: 'https://www.google.com/maps/search/?api=1&query='+crd.latitude+','+crd.longitude, address: ''});
+                    }
+
+
+                    function error(err) {
+                        if(err.code === 1){
+                            alert("Error: Access is denied!");
+                        }
+                        else if( err.code === 2){
+                            alert("Error: Position is unavailable!");
+                        } else{
+
+                        }
+                    }
+                    console.log(navigator.geolocation.getCurrentPosition(success, error, options));
+                },
+                renderImage() {
+                    const thecanvas = document.querySelector("#canvas");
+                    thecanvas.getContext('2d').drawImage(document.querySelector("#video"), 0, 0, thecanvas.width, thecanvas.height);
+   	                this.image_data_url = thecanvas.toDataURL('image/jpeg');
+                    // console.log(this.dataURLtoFile(this.image_data_url));
+                },
+                dataURLtoFile(dataurl, filename) {
+                    var arr = dataurl.split(','),
+                        mime = arr[0].match(/:(.*?);/)[1],
+                        bstr = atob(arr[1]),
+                        n = bstr.length,
+                        u8arr = new Uint8Array(n);
+
+                    while(n--){
+                        u8arr[n] = bstr.charCodeAt(n);
+                    }
+
+                    return new File([u8arr], filename, {type:mime});
+                },
+                closeCamera() {
+                    this.stream.getTracks().forEach(track => track.stop());
+                    this.isCameraAreaVisible = false;
+                    this.image_data_url = null;
+                },
+                uploadFile() {
+                    QiscusSDK.core
+                        .uploadFile(QiscusSDK.core.selected.id, this.dataURLtoFile(this.image_data_url, `${Date.now()}.jpg`))
+                },
+                verifyJwt() {
+                    QiscusSDK.core.getNonce()
+                        .then((data) => {
+                            console.log(data);
+                        });
+                },
+                deleteComment(unique_id, id) {
+                    // QiscusSDK.core.deleteComment(room_id, unique_id).then((result)=>{
+                        // console.log('tes', result)
+                        // delete di interface
+                        // document.getElementById(qiscus.selected.comments[qiscus.selected.comments.length - 1].id).remove();
+                    // })
+
+                    // delete last comment / chat
+                    // param (room_id, [comment_unique_id])
+                    qiscus.deleteComment(qiscus.selected.id, [unique_id])
+                    .then((result) => {
+                        // buang bubble di UI nya ketika berhasil di delete
+                        console.log('result', result)
+                        document.getElementById(id).remove();
+                    })
+                },
+                showDeleteUI (){
+                    this.isDeleteUI = true;
+                    this.messages = qiscus.selected.comments.filter(c => c.email == qiscus.userData.email);
+                    console.log('ini pesan', this.messages);
+
+                },
+                loadComments(id, comments) {
+                    var options = {
+                    }
+                    QiscusSDK.core.loadComments(id, options)
+                    .then((comments)=>{
+                        console.log('comments', comments)
+                    }).catch((err)=>{
+                        console.error(err)
+                    })
+                },
+                getRoomId(){
+                    console.log('room',this.currentRoom)
+                    const roomId = this.currentRoom.id
+                    qiscus.getRoomById(roomId)
+                        .then(function (room) {
+                            console.log('room ini', room)
+                            // this.currentRoom = room
+                            // On success get room,
+                            room = room
+                            // On success get comments,
+                            comments = room.comments
+                        })
+                        .catch(function (error) {
+                            // On error
+                        })
+                }
+
+            }
+        });
+
+    </script>
+</body>
+</html>
